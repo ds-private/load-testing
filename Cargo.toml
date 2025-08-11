@@ -1,0 +1,7 @@
+[workspace]
+resolver = '3'
+members = [
+    "crates/load_testing_cli",
+    "crates/load_testing_core",
+    "crates/rune_api",
+]
