@@ -3,7 +3,7 @@
 version = 4
 
 [[package]]
-name = "load_testing_cli"
+name = "forust-load-testing"
 version = "0.1.0"
 
 [[package]]
