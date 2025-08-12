@@ -19,7 +19,7 @@ pub async fn main() {
     // just like we defined in our `rune_api` crate.
     if response.status == 200 {
         // The call to .text() is also async, so it must be awaited.
-        let body = response.text().await?;
+        let body = response.text()?;
         println(`Success! Response status is ${response.status}.`);
         // In a more complex script, you could parse the `body` string here.
     } else {

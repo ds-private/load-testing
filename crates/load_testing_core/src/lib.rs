@@ -36,18 +36,17 @@ pub async fn run_test(config: TestConfig) -> anyhow::Result<()> {
     sources.insert(Source::new("script", &config.script)?)?;
 
     let mut diagnostics = Diagnostics::new();
-    let unit = Arc::new(
-        rune::prepare(&mut sources)
-            .with_context(&ctx)
-            .with_diagnostics(&mut diagnostics)
-            .build()?,
-    );
+    let build_res = rune::prepare(&mut sources)
+        .with_context(&ctx)
+        .with_diagnostics(&mut diagnostics)
+        .build();
 
     if !diagnostics.is_empty() {
         let mut writer = StandardStream::stderr(ColorChoice::Always);
         diagnostics.emit(&mut writer, &sources)?;
-    }
+    };
 
+    let unit = Arc::new(build_res?);
     let local = LocalSet::new();
 
     let vus_runner = {
