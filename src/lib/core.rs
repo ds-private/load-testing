@@ -11,99 +11,24 @@ use std::{
 use tokio::{sync::mpsc, task::LocalSet};
 
 /// A simple structure to hold the results from a single VU iteration.
-/// This is sent from each virtual user back to the main aggregator task.
 #[derive(Debug)]
 pub struct Metric {
-    /// The total time taken for a single script iteration to complete.
     pub request_duration: Duration,
 }
 
 /// Configuration for the test run, provided by the CLI layer.
 pub struct TestConfig {
-    /// The raw source code of the Rune script to be executed.
     pub script: String,
-    /// The number of concurrent virtual users to simulate.
     pub vus: u32,
-    /// The total duration for which the test should run.
     pub duration: Duration,
 }
 
 pub async fn run_test(config: TestConfig) -> anyhow::Result<()> {
+    // 1. Create the channel.
     let (tx, mut rx) = mpsc::channel::<Metric>(1000);
 
-    let ctx = Arc::new(rune_api::our_tool()?);
-    let runtime = Arc::new(ctx.runtime()?);
-
-    let mut sources = Sources::new();
-    sources.insert(Source::new("script", &config.script)?)?;
-
-    let mut diagnostics = Diagnostics::new();
-    let build_res = rune::prepare(&mut sources)
-        .with_context(&ctx)
-        .with_diagnostics(&mut diagnostics)
-        .build();
-
-    if !diagnostics.is_empty() {
-        let mut writer = StandardStream::stderr(ColorChoice::Always);
-        diagnostics.emit(&mut writer, &sources)?;
-    };
-
-    let unit = Arc::new(build_res?);
-    let local = LocalSet::new();
-
-    let vus_runner = {
-        let unit = unit.clone();
-        let runtime = runtime.clone();
-        let tx = tx.clone();
-
-        local.run_until(async move {
-            // Create a place to store the handles for all the VU tasks.
-            let mut handles = Vec::new();
-
-            for i in 0..config.vus {
-                let unit = unit.clone();
-                let runtime = runtime.clone();
-                let tx = tx.clone();
-                let duration = config.duration;
-
-                // Spawn the local task and push its handle into the vec.
-                let handle = tokio::task::spawn_local(async move {
-                    println!("Spawning VU {}", i + 1);
-                    let mut vm = Vm::new(runtime, unit);
-                    let test_end = Instant::now() + duration;
-
-                    while Instant::now() < test_end {
-                        let start = Instant::now();
-
-                        match vm.async_call(["main"], ()).await {
-                            Ok(_) => {}
-                            Err(e) => eprintln!("VU {} script error: {}", i + 1, e),
-                        }
-
-                        let metric = Metric {
-                            request_duration: start.elapsed(),
-                        };
-
-                        if tx.send(metric).await.is_err() {
-                            // Stop if the aggregator has shut down.
-                            break;
-                        }
-                    }
-                    println!("VU {} finished.", i + 1);
-                });
-
-                handles.push(handle);
-            }
-
-            // Wait for all the spawned VU tasks to complete.
-            // This is the crucial change that fixes the hang.
-            join_all(handles).await;
-
-            // Now, we can safely drop the transmitter.
-            drop(tx);
-        })
-    };
-    let aggregator = async move {
+    // 2. Spawn the aggregator as an independent background task.
+    let aggregator_handle = tokio::spawn(async move {
         let mut total_requests = 0u64;
         let mut total_duration = Duration::ZERO;
         let mut max_duration = Duration::ZERO;
@@ -124,8 +49,84 @@ pub async fn run_test(config: TestConfig) -> anyhow::Result<()> {
             println!("Max Duration:     {:?}", max_duration);
         }
         println!("---------------------\n");
-    };
+    });
 
-    tokio::join!(vus_runner, aggregator);
+    // 3. Create the LocalSet to run the VUs.
+    let local = LocalSet::new();
+
+    // 4. Run the LocalSet. All Rune setup and VU spawning happens inside.
+    local
+        .run_until(async move {
+            // --- RUNE SETUP MOVED INSIDE ---
+            let ctx = Arc::new(rune_api::our_tool().expect("Failed to build rune context"));
+            let runtime = Arc::new(ctx.runtime().expect("Failed to get rune runtime"));
+
+            let mut sources = Sources::new();
+            sources
+                .insert(Source::new("script", &config.script).expect("Failed to load script"))
+                .unwrap();
+
+            let mut diagnostics = Diagnostics::new();
+            let unit = Arc::new(
+                rune::prepare(&mut sources)
+                    .with_context(&ctx)
+                    .with_diagnostics(&mut diagnostics)
+                    .build()
+                    .expect("Failed to build rune sources"),
+            );
+
+            if !diagnostics.is_empty() {
+                let mut writer = StandardStream::stderr(ColorChoice::Always);
+                diagnostics.emit(&mut writer, &sources).unwrap();
+                // Optionally panic or exit here if there are build errors.
+            }
+            // --- END OF MOVED SETUP ---
+
+            let mut handles = Vec::new();
+
+            for i in 0..config.vus {
+                let unit = unit.clone();
+                let runtime = runtime.clone();
+                let tx = tx.clone();
+                let duration = config.duration;
+
+                let handle = tokio::task::spawn_local(async move {
+                    println!("Spawning VU {}", i + 1);
+                    let mut vm = Vm::new(runtime, unit);
+                    let test_end = Instant::now() + duration;
+
+                    while Instant::now() < test_end {
+                        let start = Instant::now();
+                        if let Err(e) = vm.async_call(["main"], ()).await {
+                            eprintln!("VU {} script error: {}", i + 1, e);
+                        }
+                        if tx
+                            .send(Metric {
+                                request_duration: start.elapsed(),
+                            })
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    println!("VU {} finished.", i + 1);
+                });
+                handles.push(handle);
+            }
+
+            // This drop is critical. It ensures the only `tx` clones left
+            // are the ones inside the VUs.
+            drop(tx);
+
+            // Wait for all VUs to finish.
+            join_all(handles).await;
+        })
+        .await;
+
+    // 5. Wait for the aggregator to finish.
+    // It will finish naturally because the channel is now guaranteed to close.
+    aggregator_handle.await?;
+
     Ok(())
 }
