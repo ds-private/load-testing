@@ -331,8 +331,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "http-body-util",
  "humantime",
- "load_testing_core",
+ "hyper",
+ "hyper-rustls",
+ "hyper-util",
+ "rune",
+ "rustls-native-certs",
  "tokio",
 ]
 
@@ -618,16 +623,6 @@ name = "linux-raw-sys"
 version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d26c52dbd32dccf2d10cac7725f8eae5296885fb5703b261f7d0a0739ec807ab"
-
-[[package]]
-name = "load_testing_core"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "rune",
- "rune_api",
- "tokio",
-]
 
 [[package]]
 name = "lock_api"
@@ -958,9 +953,9 @@ checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 
 [[package]]
 name = "redox_syscall"
-version = "0.5.15"
+version = "0.5.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e8af0dde094006011e6a740d4879319439489813bd0bcdc7d821beaeeff48ec"
+checksum = "5407465600fb0548f1442edf71dd20683c6ed326200ace4b1ef0763521bb3b77"
 dependencies = [
  "bitflags",
 ]
@@ -1114,19 +1109,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "rune_api"
-version = "0.1.0"
-dependencies = [
- "http-body-util",
- "hyper",
- "hyper-rustls",
- "hyper-util",
- "rune",
- "rustls-native-certs",
- "tokio",
 ]
 
 [[package]]
@@ -1295,9 +1277,9 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "signal-hook-registry"
-version = "1.4.5"
+version = "1.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9203b8055f63a2a00e2f593bb0510367fe707d7ff1e5c872de2f537b339e5410"
+checksum = "b2a4719bff48cee6b39d12c020eeb490953ad2443b7055bd0b21fca26bd8c28b"
 dependencies = [
  "libc",
 ]

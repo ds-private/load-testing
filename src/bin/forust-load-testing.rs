@@ -1,5 +1,5 @@
 use clap::Parser;
-use load_testing_core::{TestConfig, run_test};
+use forust_load_testing_lib::core::{TestConfig, run_test};
 use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;

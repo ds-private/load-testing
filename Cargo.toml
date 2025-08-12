@@ -1,7 +1,23 @@
-[workspace]
-resolver = '3'
-members = [
-    "crates/load_testing_cli",
-    "crates/load_testing_core",
-    "crates/rune_api",
-]
+[package]
+name = "forust-load-testing"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.98"
+clap = { version = "4.5.44", features = ["derive"] }
+http-body-util = "0.1.3"
+humantime = "2.2.0"
+hyper-rustls = "0.27.7"
+hyper-util = { version = "0.1.16", features = ["client-legacy", "tokio"] }
+hyper = { version = "1.6.0", features = ["http1", "client"] }
+rune = "0.14.0"
+rustls-native-certs = "0.8.1"
+tokio = { version = "1.47.1", features = ["full", "macros", "rt-multi-thread"] }
+
+[[bin]]
+name = "forust-load-testing"
+
+[lib]
+name = "forust_load_testing_lib"
+path = "src/lib/mod.rs"

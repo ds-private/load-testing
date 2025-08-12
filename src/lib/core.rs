@@ -8,6 +8,8 @@ use std::{
 };
 use tokio::{sync::mpsc, task::LocalSet};
 
+use crate::rune_api;
+
 /// A simple structure to hold the results from a single VU iteration.
 /// This is sent from each virtual user back to the main aggregator task.
 #[derive(Debug)]
