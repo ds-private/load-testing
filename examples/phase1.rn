@@ -1,9 +1,7 @@
 // This is a Rune script, which has a syntax very similar to Rust.
 
 // The `get` function is located in the `http` module we defined in Rust.
-// The `sleep` function is at the root of the module.
 use http::get;
-use sleep;
 
 // All test scripts must have a `pub async fn main()` function,
 // which is the entry point for each virtual user.
@@ -17,13 +15,13 @@ pub async fn main() {
     // 2. Check the response object.
     // The `response` object has a `status` field and a `text()` method,
     // just like we defined in our `rune_api` crate.
-    if response.status == 200 {
+    if response.status() == 200 {
         // The call to .text() is also async, so it must be awaited.
-        let body = response.text()?;
-        println(`Success! Response status is ${response.status}.`);
+        let body = response.text();
+        println(`Success! Response status is ${response.status()}.`);
         // In a more complex script, you could parse the `body` string here.
     } else {
-        println(`Request failed with status code: ${response.status}`);
+        println(`Request failed with status code: ${response.status()}`);
     }
 
     // 3. Simulate user "think time" by pausing the script execution.

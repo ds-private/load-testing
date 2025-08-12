@@ -1,3 +1,5 @@
+use crate::rune_api;
+use futures::future::join_all;
 use rune::{
     Diagnostics, Source, Sources, Vm,
     termcolor::{ColorChoice, StandardStream},
@@ -7,8 +9,6 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{sync::mpsc, task::LocalSet};
-
-use crate::rune_api;
 
 /// A simple structure to hold the results from a single VU iteration.
 /// This is sent from each virtual user back to the main aggregator task.
@@ -57,13 +57,17 @@ pub async fn run_test(config: TestConfig) -> anyhow::Result<()> {
         let tx = tx.clone();
 
         local.run_until(async move {
+            // Create a place to store the handles for all the VU tasks.
+            let mut handles = Vec::new();
+
             for i in 0..config.vus {
                 let unit = unit.clone();
                 let runtime = runtime.clone();
                 let tx = tx.clone();
                 let duration = config.duration;
 
-                tokio::task::spawn_local(async move {
+                // Spawn the local task and push its handle into the vec.
+                let handle = tokio::task::spawn_local(async move {
                     println!("Spawning VU {}", i + 1);
                     let mut vm = Vm::new(runtime, unit);
                     let test_end = Instant::now() + duration;
@@ -81,16 +85,24 @@ pub async fn run_test(config: TestConfig) -> anyhow::Result<()> {
                         };
 
                         if tx.send(metric).await.is_err() {
+                            // Stop if the aggregator has shut down.
                             break;
                         }
                     }
                     println!("VU {} finished.", i + 1);
                 });
+
+                handles.push(handle);
             }
+
+            // Wait for all the spawned VU tasks to complete.
+            // This is the crucial change that fixes the hang.
+            join_all(handles).await;
+
+            // Now, we can safely drop the transmitter.
             drop(tx);
         })
     };
-
     let aggregator = async move {
         let mut total_requests = 0u64;
         let mut total_duration = Duration::ZERO;

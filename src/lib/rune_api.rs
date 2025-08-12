@@ -16,6 +16,11 @@ impl HttpResponse {
     fn text(&self) -> String {
         self.body.clone()
     }
+
+    #[rune::function(instance)]
+    fn status(&self) -> u16 {
+        self.status.clone()
+    }
 }
 
 #[rune::function]
@@ -67,6 +72,7 @@ pub fn our_tool() -> Result<rune::Context, ContextError> {
     let mut root = Module::new();
     root.ty::<HttpResponse>()?;
     root.function_meta(HttpResponse::text)?;
+    root.function_meta(HttpResponse::status)?;
     root.function_meta(sleep)?;
     let mut http = Module::with_item(["http"])?;
     http.function_meta(get)?;
